@@ -52,19 +52,33 @@ int read_buf_from_file(unsigned char *buf, unsigned long size,
 		ret = 1;
 		goto out;
 	}
-	if ((image_stat.st_size != (intmax_t)size) && strcmp(filename, "-")) {
-		msg_gerr("Error: Image size (%jd B) doesn't match the expected size (%lu B)!\n",
-			 (intmax_t)image_stat.st_size, size);
-		ret = 1;
-		goto out;
+	if (image_stat.st_size < (intmax_t)size) {
+		msg_cinfo("Input image file size is smaller than chip size, padding input file size with 0xFF to chip size\n");
+		memset(buf, 0xFF,(intmax_t)size);
+		unsigned long numbytes = fread(buf, 1, image_stat.st_size, image);
+		if ((intmax_t)numbytes != image_stat.st_size) {
+			msg_gerr("Error: Failed to read complete file. Got %ld bytes, "
+				"wanted %ld!\n", numbytes, size);
+			ret = 1;
+		}
+	}
+	else {
+		if ((image_stat.st_size != (intmax_t)size) && strcmp(filename, "-")) {
+			msg_gerr("Error: Image size (%jd B) doesn't match the expected size (%lu B)!\n",
+				(intmax_t)image_stat.st_size, size);
+			ret = 1;
+			goto out;
+		}
+		unsigned long numbytes = fread(buf, 1, size, image);
+		if (numbytes != size) {
+			msg_gerr("Error: Failed to read complete file. Got %ld bytes, "
+				"wanted %ld!\n", numbytes, size);
+			ret = 1;
+		}
 	}
 
-	unsigned long numbytes = fread(buf, 1, size, image);
-	if (numbytes != size) {
-		msg_gerr("Error: Failed to read complete file. Got %ld bytes, "
-			 "wanted %ld!\n", numbytes, size);
-		ret = 1;
-	}
+
+
 out:
 	(void)fclose(image);
 	return ret;

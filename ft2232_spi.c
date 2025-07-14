@@ -626,7 +626,7 @@ format_error:
 		msg_perr("Unable to reset FTDI device (%s).\n", ftdi_get_error_string(&ftdic));
 	}
 
-	if (ftdi_set_latency_timer(&ftdic, 2) < 0) {
+	if (ftdi_set_latency_timer(&ftdic, 0) < 0) {
 		msg_perr("Unable to set latency timer (%s).\n", ftdi_get_error_string(&ftdic));
 	}
 

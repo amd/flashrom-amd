@@ -85,7 +85,7 @@ void flashrom_progress_cb(struct flashrom_flashctx *flashctx)
 		     ((unsigned long long) progress_state->total * 100llu);
 	if (percentages[progress_state->stage] != pc) {
 		percentages[progress_state->stage] = pc;
-		msg_ginfo("[%s] %u%% complete... ", flashrom_progress_stage_to_string(progress_state->stage), pc);
+		msg_ginfo("[%s] %u%% complete... \n", flashrom_progress_stage_to_string(progress_state->stage), pc);
 	}
 }
 

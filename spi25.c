@@ -693,14 +693,19 @@ int spi_read_chunked(struct flashctx *flash, uint8_t *buf, unsigned int start,
 {
 	int ret;
 	size_t to_read;
-	size_t start_address = start;
-	size_t end_address = len - start;
+	unsigned int progress = 0;
+	unsigned int prev_progress = -1;
 	for (; len; len -= to_read, buf += to_read, start += to_read) {
 		to_read = min(chunksize, len);
 		ret = spi_nbyte_read(flash, start, buf, to_read);
 		if (ret)
 			return ret;
-		update_progress(flash, FLASHROM_PROGRESS_READ, start - start_address + to_read, end_address);
+//		update_progress(flash, FLASHROM_PROGRESS_READ, start, flash->chip->total_size * 1024);
+		progress = (uint8_t) ((float) (start + to_read) / (float) (flash->chip->total_size * 1024) * 10);
+		if (prev_progress != progress) {
+			update_progress(flash, FLASHROM_PROGRESS_READ, progress, 10);
+		}
+		prev_progress = progress;
 	}
 	return 0;
 }
@@ -720,8 +725,8 @@ int spi_write_chunked(struct flashctx *flash, const uint8_t *buf, unsigned int s
 	 * we're OK for now.
 	 */
 	unsigned int page_size = flash->chip->page_size;
-	size_t start_address = start;
-	size_t end_address = len - start;
+//	size_t start_address = start;
+//	size_t end_address = len - start;
 
 	/* Warning: This loop has a very unusual condition and body.
 	 * The loop needs to go through each page with at least one affected
@@ -732,6 +737,11 @@ int spi_write_chunked(struct flashctx *flash, const uint8_t *buf, unsigned int s
 	 * (start + len - 1) / page_size. Since we want to include that last
 	 * page as well, the loop condition uses <=.
 	 */
+
+	unsigned int progress = 0;
+	unsigned int prev_progress = -1;
+	lenhere = 0;
+	starthere = 0;
 	for (i = start / page_size; i <= (start + len - 1) / page_size; i++) {
 		/* Byte position of the first byte in the range in this page. */
 		/* starthere is an offset to the base address of the chip. */
@@ -746,9 +756,13 @@ int spi_write_chunked(struct flashctx *flash, const uint8_t *buf, unsigned int s
 			if (rc)
 				return rc;
 		}
-		update_progress(flash, FLASHROM_PROGRESS_WRITE, start - start_address + lenhere, end_address);
+//		update_progress(flash, FLASHROM_PROGRESS_WRITE, start - start_address + lenhere, end_address);
+		progress = (uint8_t) ((float) (starthere + lenhere) / (float) (flash->chip->total_size * 1024) * 10);
+		if (prev_progress != progress) {
+			update_progress(flash, FLASHROM_PROGRESS_WRITE, progress, 10);
+		}
+		prev_progress = progress;
 	}
-
 	return 0;
 }
 

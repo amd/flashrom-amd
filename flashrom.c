@@ -70,6 +70,9 @@ struct programmer_cfg {
 	char *params;
 };
 
+static bool g_do_erase = false;
+static bool g_do_write = false;
+
 /* Register a function to be executed on programmer shutdown.
  * The advantage over atexit() is that you can supply a void pointer which will
  * be used as parameter to the registered function upon programmer shutdown.
@@ -1054,7 +1057,7 @@ static int walk_by_layout(struct flashctx *const flashctx, struct walk_info *con
 	const struct romentry *entry = NULL;
 
 	all_skipped = true;
-	msg_cinfo("Erasing and writing flash chip... ");
+	msg_cinfo("Erasing and writing flash chip... \n");
 
 	while ((entry = layout_next_included(layout, entry))) {
 		info->region_start = entry->start;
@@ -1093,6 +1096,11 @@ static int walk_by_layout(struct flashctx *const flashctx, struct walk_info *con
 			return 1;
 		}
 	}
+	if (g_do_write) {
+		g_do_write = false;
+		update_progress(flashctx, FLASHROM_PROGRESS_WRITE, 10, 10);
+	}
+
 	if (all_skipped)
 		msg_cinfo("\nWarning: Chip content is identical to the requested image.\n");
 	msg_cinfo("Erase/write done.\n");
@@ -1103,47 +1111,47 @@ static int erase_block(struct flashctx *const flashctx,
 		       const struct walk_info *const info, const erasefn_t erasefn)
 {
 	const unsigned int erase_len = info->erase_end + 1 - info->erase_start;
-	const bool region_unaligned = info->region_start > info->erase_start ||
-				      info->erase_end > info->region_end;
+//	const bool region_unaligned = info->region_start > info->erase_start ||
+//				      info->erase_end > info->region_end;
 	uint8_t *backup_contents = NULL, *erased_contents = NULL;
 	int ret = 2;
 
-	/*
-	 * If the region is not erase-block aligned, merge current flash con-
-	 * tents into a new buffer `backup_contents`.
-	 */
-	if (region_unaligned) {
-		backup_contents = malloc(erase_len);
-		erased_contents = malloc(erase_len);
-		if (!backup_contents || !erased_contents) {
-			msg_cerr("Out of memory!\n");
-			ret = 1;
-			goto _free_ret;
-		}
-		memset(backup_contents, ERASED_VALUE(flashctx), erase_len);
-		memset(erased_contents, ERASED_VALUE(flashctx), erase_len);
-
-		msg_cdbg("R");
-		/* Merge data preceding the current region. */
-		if (info->region_start > info->erase_start) {
-			const chipoff_t start	= info->erase_start;
-			const chipsize_t len	= info->region_start - info->erase_start;
-			if (flashctx->chip->read(flashctx, backup_contents, start, len)) {
-				msg_cerr("Can't read! Aborting.\n");
-				goto _free_ret;
-			}
-		}
-		/* Merge data following the current region. */
-		if (info->erase_end > info->region_end) {
-			const chipoff_t start     = info->region_end + 1;
-			const chipoff_t rel_start = start - info->erase_start; /* within this erase block */
-			const chipsize_t len      = info->erase_end - info->region_end;
-			if (flashctx->chip->read(flashctx, backup_contents + rel_start, start, len)) {
-				msg_cerr("Can't read! Aborting.\n");
-				goto _free_ret;
-			}
-		}
-	}
+//	/*
+//	 * If the region is not erase-block aligned, merge current flash con-
+//	 * tents into a new buffer `backup_contents`.
+//	 */
+//	if (region_unaligned) {
+//		backup_contents = malloc(erase_len);
+//		erased_contents = malloc(erase_len);
+//		if (!backup_contents || !erased_contents) {
+//			msg_cerr("Out of memory!\n");
+//			ret = 1;
+//			goto _free_ret;
+//		}
+//		memset(backup_contents, ERASED_VALUE(flashctx), erase_len);
+//		memset(erased_contents, ERASED_VALUE(flashctx), erase_len);
+//
+//		msg_cdbg("R");
+//		/* Merge data preceding the current region. */
+//		if (info->region_start > info->erase_start) {
+//			const chipoff_t start	= info->erase_start;
+//			const chipsize_t len	= info->region_start - info->erase_start;
+//			if (flashctx->chip->read(flashctx, backup_contents, start, len)) {
+//				msg_cerr("Can't read! Aborting.\n");
+//				goto _free_ret;
+//			}
+//		}
+//		/* Merge data following the current region. */
+//		if (info->erase_end > info->region_end) {
+//			const chipoff_t start     = info->region_end + 1;
+//			const chipoff_t rel_start = start - info->erase_start; /* within this erase block */
+//			const chipsize_t len      = info->erase_end - info->region_end;
+//			if (flashctx->chip->read(flashctx, backup_contents + rel_start, start, len)) {
+//				msg_cerr("Can't read! Aborting.\n");
+//				goto _free_ret;
+//			}
+//		}
+//	}
 
 	ret = 1;
 	all_skipped = false;
@@ -1151,25 +1159,29 @@ static int erase_block(struct flashctx *const flashctx,
 	msg_cdbg("E");
 	if (erasefn(flashctx, info->erase_start, erase_len))
 		goto _free_ret;
-	if (check_erased_range(flashctx, info->erase_start, erase_len)) {
-		msg_cerr("ERASE FAILED!\n");
-		goto _free_ret;
-	}
-
-	if (region_unaligned) {
-		unsigned int starthere = 0, lenhere = 0, writecount = 0;
-		/* get_next_write() sets starthere to a new value after the call. */
-		while ((lenhere = get_next_write(erased_contents + starthere, backup_contents + starthere,
-						 erase_len - starthere, &starthere, flashctx->chip->gran))) {
-			if (!writecount++)
-				msg_cdbg("W");
-			/* Needs the partial write function signature. */
-			if (flashctx->chip->write(flashctx, backup_contents + starthere,
-						  info->erase_start + starthere, lenhere))
-				goto _free_ret;
-			starthere += lenhere;
+	if (g_do_erase) {
+		g_do_erase = false;
+		msg_cinfo("Check content after erasing\n");
+		if (check_erased_range(flashctx, info->erase_start, erase_len)) {
+			msg_cerr("ERASE FAILED!\n");
+			goto _free_ret;
 		}
 	}
+
+//	if (region_unaligned) {
+//		unsigned int starthere = 0, lenhere = 0, writecount = 0;
+//		/* get_next_write() sets starthere to a new value after the call. */
+//		while ((lenhere = get_next_write(erased_contents + starthere, backup_contents + starthere,
+//						 erase_len - starthere, &starthere, flashctx->chip->gran))) {
+//			if (!writecount++)
+//				msg_cdbg("W");
+//			/* Needs the partial write function signature. */
+//			if (flashctx->chip->write(flashctx, backup_contents + starthere,
+//						  info->erase_start + starthere, lenhere))
+//				goto _free_ret;
+//			starthere += lenhere;
+//		}
+//	}
 
 	ret = 0;
 
@@ -1192,6 +1204,7 @@ _free_ret:
 static int erase_by_layout(struct flashctx *const flashctx)
 {
 	struct walk_info info = { 0 };
+	g_do_erase = true;
 	return walk_by_layout(flashctx, &info, &erase_block);
 }
 
@@ -1308,6 +1321,7 @@ static int write_by_layout(struct flashctx *const flashctx,
 	struct walk_info info;
 	info.curcontents = curcontents;
 	info.newcontents = newcontents;
+	g_do_write = true;
 	return walk_by_layout(flashctx, &info, read_erase_write_block);
 }
 
@@ -1742,20 +1756,20 @@ int flashrom_image_write(struct flashctx *const flashctx, void *const buffer, co
 		 * preserved, but in that case we might perform unneeded erase which
 		 * takes time as well.
 		 */
-		msg_cinfo("Reading old flash chip contents... ");
-		if (verify_all) {
-			if (flashctx->chip->read(flashctx, oldcontents, 0, flash_size)) {
-				msg_cinfo("FAILED.\n");
-				goto _finalize_ret;
-			}
-			memcpy(curcontents, oldcontents, flash_size);
-		} else {
-			if (read_by_layout(flashctx, curcontents)) {
-				msg_cinfo("FAILED.\n");
-				goto _finalize_ret;
-			}
-		}
-		msg_cinfo("done.\n");
+//		msg_cinfo("Reading old flash chip contents... \n");
+//		if (verify_all) {
+//			if (flashctx->chip->read(flashctx, oldcontents, 0, flash_size)) {
+//				msg_cinfo("FAILED.\n");
+//				goto _finalize_ret;
+//			}
+//			memcpy(curcontents, oldcontents, flash_size);
+//		} else {
+//			if (read_by_layout(flashctx, curcontents)) {
+//				msg_cinfo("FAILED.\n");
+//				goto _finalize_ret;
+//			}
+//		}
+//		msg_cinfo("done.\n");
 	}
 
 	if (write_by_layout(flashctx, curcontents, newcontents)) {
@@ -1784,7 +1798,7 @@ int flashrom_image_write(struct flashctx *const flashctx, void *const buffer, co
 
 	/* Verify only if we actually changed something. */
 	if (verify && !all_skipped) {
-		msg_cinfo("Verifying flash... ");
+		msg_cinfo("Verifying flash... \n");
 
 		/* Work around chips which need some time to calm down. */
 		programmer_delay(1000*1000);
@@ -1831,7 +1845,7 @@ int flashrom_image_verify(struct flashctx *const flashctx, const void *const buf
 	if (prepare_flash_access(flashctx, false, false, false, true))
 		goto _free_ret;
 
-	msg_cinfo("Verifying flash... ");
+	msg_cinfo("Verifying flash... \n");
 	ret = verify_by_layout(flashctx, layout, curcontents, newcontents);
 	if (!ret)
 		msg_cinfo("VERIFIED.\n");
