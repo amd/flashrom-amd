@@ -7314,6 +7314,41 @@ const struct flashchip flashchips[] = {
 	},
 
 	{
+		.vendor		= "GigaDevice",
+		.name		= "GD25LB512MF/GD25LR512MF",
+		.bustype	= BUS_SPI,
+		.manufacture_id	= GIGADEVICE_ID,
+		.model_id	= GIGADEVICE_GD25LB512MF,
+		.total_size	= 65536,
+		.page_size	= 256,
+		.feature_bits	= FEATURE_WRSR_WREN | FEATURE_OTP | FEATURE_WRSR_EXT2 | FEATURE_4BA,
+		.tested		= TEST_OK_PREW,
+		.probe		= probe_spi_rdid,
+		.probe_timing	= TIMING_ZERO,
+		.block_erasers	=
+		{
+			{
+				.eraseblocks = { {64 * 1024 * 1024, 1} },
+				.block_erase = spi_block_erase_c7,
+			}
+		},
+		.printlock      = spi_prettyprint_status_register_bp4_srwd,
+		.unlock         = spi_disable_blockprotect_bp4_srwd,
+		.write		= spi_chip_write_256,
+		.read		= spi_chip_read,
+		.voltage	= {1695, 1950},
+		.reg_bits	=
+		{
+			.srp    = {STATUS1, 7, RW},
+			.bp     = {{STATUS1, 2, RW}, {STATUS1, 3, RW}, {STATUS1, 4, RW}, {STATUS1, 5, RW}},
+			.tb     = {STATUS1, 6, RW},	/* Called BP4 in datasheet, acts like TB */
+			.srl    = {STATUS2, 0, RW},
+			.cmp    = {STATUS2, 6, RW},
+		},
+		.decode_range	= decode_range_spi25,
+	},
+
+	{
 		.vendor		= "Hyundai",
 		.name		= "HY29F002B",
 		.bustype	= BUS_PARALLEL,
