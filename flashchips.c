@@ -11886,31 +11886,30 @@ const struct flashchip flashchips[] = {
 		.probe_timing	= TIMING_ZERO,
 		.block_erasers	=
 		{
+			// {
+			// 	.eraseblocks = { {4 * 1024, 8192} },
+			// 	.block_erase = spi_block_erase_21,
+			// }, {
+			// 	.eraseblocks = { {4 * 1024, 8192} },
+			// 	.block_erase = spi_block_erase_20,
+			// }, {
+			// 	.eraseblocks = { {32 * 1024, 1024} },
+			// 	.block_erase = spi_block_erase_5c,
+			// }, {
+			// 	.eraseblocks = { {32 * 1024, 1024} },
+			// 	.block_erase = spi_block_erase_52,
+			// }, {
+			// 	.eraseblocks = { {64 * 1024, 512} },
+			// 	.block_erase = spi_block_erase_dc,
+			// }, {
+			// 	.eraseblocks = { {64 * 1024, 512} },
+			// 	.block_erase = spi_block_erase_d8,
+			// }, 
 			{
-				.eraseblocks = { {4 * 1024, 8192} },
-				.block_erase = spi_block_erase_21,
-			}, {
-				.eraseblocks = { {4 * 1024, 8192} },
-				.block_erase = spi_block_erase_20,
-			}, {
-				.eraseblocks = { {32 * 1024, 1024} },
-				.block_erase = spi_block_erase_5c,
-			}, {
-				.eraseblocks = { {32 * 1024, 1024} },
-				.block_erase = spi_block_erase_52,
-			}, {
-				.eraseblocks = { {64 * 1024, 512} },
-				.block_erase = spi_block_erase_dc,
-			}, {
-				.eraseblocks = { {64 * 1024, 512} },
-				.block_erase = spi_block_erase_d8,
-			}, {
 				.eraseblocks = { {32768 * 1024, 1} },
 				.block_erase = spi_block_erase_c7,
-			}, {
-				.eraseblocks = { {32768 * 1024, 1} },
-				.block_erase = spi_block_erase_60,
-			}
+			}, 
+
 		},
 		.printlock	= spi_prettyprint_status_register_n25q, /* TODO: config, lock, flag regs */
 		.unlock		= spi_disable_blockprotect_n25q, /* TODO: per 64kB sector lock registers */
