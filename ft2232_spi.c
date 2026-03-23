@@ -85,6 +85,7 @@ static const struct dev_entry devs_ft2232spi[] = {
 #define FTDI_HW_BUFFER_SIZE 4096 /* in bytes */
 
 #define DEFAULT_DIVISOR 2
+#define DEFAULT_LATENCY_TIMER 2 /* in ms */
 
 #define BITMODE_BITBANG_NORMAL	1
 #define BITMODE_BITBANG_SPI	2
@@ -329,6 +330,7 @@ static int ft2232_spi_init(const struct programmer_cfg *cfg)
 	 * inputs.
 	 */
 	uint32_t divisor = DEFAULT_DIVISOR;
+	unsigned char latency_timer = DEFAULT_LATENCY_TIMER;
 	int f;
 	char *arg, *arg2;
 	double mpsse_clk;
@@ -496,6 +498,27 @@ static int ft2232_spi_init(const struct programmer_cfg *cfg)
 	}
 	free(arg);
 
+	arg = extract_programmer_param_str(cfg, "latency_timer");
+	if (arg) {
+		char *endptr;
+		unsigned int temp = strtoul(arg, &endptr, 10);
+		/*
+		 * The latency timer range is actually [1, 255]. A value of 0 is not
+		 * allowed by libftdi. However when modifying the underlying FTDI
+		 * library to accept 0, improved overall throughput can be observed in
+		 * some environments. Here in flashrom, we do not explicitly prohibit
+		 * this value, allowing libftdi to perform the validation.
+		 */
+		if (*endptr || temp > 255) {
+			msg_perr("Error: Invalid FTDI latency timer specified: \"%s\".\n"
+				 "Valid values are within [1, 255].\n", arg);
+			free(arg);
+			return -2;
+		}
+		latency_timer = (unsigned char)temp;
+	}
+	free(arg);
+
 	bool csgpiol_set = false;
 	arg = extract_programmer_param_str(cfg, "csgpiol");
 	if (arg) {
@@ -626,7 +649,7 @@ format_error:
 		msg_perr("Unable to reset FTDI device (%s).\n", ftdi_get_error_string(&ftdic));
 	}
 
-	if (ftdi_set_latency_timer(&ftdic, 0) < 0) {
+	if (ftdi_set_latency_timer(&ftdic, latency_timer) < 0) {
 		msg_perr("Unable to set latency timer (%s).\n", ftdi_get_error_string(&ftdic));
 	}
 
