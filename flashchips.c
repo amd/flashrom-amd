@@ -11731,7 +11731,7 @@ const struct flashchip flashchips[] = {
 			// 	.block_erase = spi_block_erase_d8,
 			// }, 
 			{
-				.eraseblocks = { {262144 * 1024, 4} },
+				.eraseblocks = { {65536 * 1024, 4} },
 				.block_erase = spi_block_erase_c4,
 			}
 		},
