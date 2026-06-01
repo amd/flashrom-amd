@@ -305,6 +305,62 @@ static const struct spi_master spi_master_ft2232 = {
 	.probe_opcode	= default_spi_probe_opcode,
 };
 
+/*
+ * Open an FTDI device by VID/PID, optionally filtered by description/serial.
+ *
+ * libftdi's ftdi_usb_open_desc() aborts the whole search (error -9) on the
+ * first matching device whose serial number can't be read. Blank/unprogrammed
+ * FTDI chips have no serial descriptor, so one such chip on the bus hides an
+ * already-programmed chip with the requested serial. Skip unreadable (and
+ * non-matching) devices instead of bailing out.
+ *
+ * Returns like ftdi_usb_open_dev(): 0 on success, -5 if found but not claimed,
+ * or another negative libftdi error (e.g. -3 if not found).
+ */
+static int ft2232_open_device(struct ftdi_context *ftdic, int vid, int pid,
+			      const char *description, const char *serial)
+{
+	/* No filter given: keep libftdi's original "first matching device" behavior. */
+	if (!description && !serial)
+		return ftdi_usb_open_desc(ftdic, vid, pid, NULL, NULL);
+
+	struct ftdi_device_list *devlist, *curdev;
+	int ret = ftdi_usb_find_all(ftdic, &devlist, vid, pid);
+	if (ret < 0) {
+		msg_perr("Unable to list FTDI devices: %d (%s)\n", ret,
+			 ftdi_get_error_string(ftdic));
+		return ret;
+	}
+
+	ret = -3; /* libftdi's "device not found" */
+	for (curdev = devlist; curdev != NULL; curdev = curdev->next) {
+		char desc_str[256] = "";
+		char serial_str[256] = "";
+
+		/* ftdi_usb_get_strings() opens and closes the device itself. */
+		int res = ftdi_usb_get_strings(ftdic, curdev->dev, NULL, 0,
+					       description ? desc_str : NULL, sizeof(desc_str),
+					       serial ? serial_str : NULL, sizeof(serial_str));
+		if (res < 0) {
+			/* Blank/unreadable chip (e.g. -9 for a missing serial). Skip it. */
+			msg_pdbg("Skipping FTDI device whose strings cannot be read: "
+				 "%d (%s).\n", res, ftdi_get_error_string(ftdic));
+			continue;
+		}
+
+		if (description && strncmp(desc_str, description, sizeof(desc_str)) != 0)
+			continue;
+		if (serial && strncmp(serial_str, serial, sizeof(serial_str)) != 0)
+			continue;
+
+		ret = ftdi_usb_open_dev(ftdic, curdev->dev);
+		break;
+	}
+
+	ftdi_list_free(&devlist);
+	return ret;
+}
+
 /* Returns 0 upon success, a negative number upon errors. */
 static int ft2232_spi_init(const struct programmer_cfg *cfg)
 {
@@ -629,7 +685,7 @@ format_error:
 	arg = extract_programmer_param_str(cfg, "serial");
 	arg2 = extract_programmer_param_str(cfg, "description");
 
-	f = ftdi_usb_open_desc(&ftdic, ft2232_vid, ft2232_type, arg2, arg);
+	f = ft2232_open_device(&ftdic, ft2232_vid, ft2232_type, arg2, arg);
 
 	free(arg);
 	free(arg2);
