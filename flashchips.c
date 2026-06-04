@@ -17841,7 +17841,7 @@ const struct flashchip flashchips[] = {
 
 	{
 		.vendor		= "Winbond",
-		.name		= "W25Q256JW",
+		.name		= "W74M25JW/W25Q256JW",
 		.bustype	= BUS_SPI,
 		.manufacture_id	= WINBOND_NEX_ID,
 		.model_id	= WINBOND_NEX_W25Q256_W,
@@ -17855,7 +17855,7 @@ const struct flashchip flashchips[] = {
 		.probe_timing	= TIMING_ZERO,
 		.block_erasers	=
 		{
-			{
+//          {
 //				.eraseblocks = { {4 * 1024, 8192} },
 //				.block_erase = spi_block_erase_21,
 //			}, {
@@ -17864,16 +17864,17 @@ const struct flashchip flashchips[] = {
 //			}, {
 //				.eraseblocks = { {32 * 1024, 1024} },
 //				.block_erase = spi_block_erase_52,
-//			}, {
-//				.eraseblocks = { {64 * 1024, 512} },
-//				.block_erase = spi_block_erase_dc,
-//			}, {
-//				.eraseblocks = { {64 * 1024, 512} },
-//				.block_erase = spi_block_erase_d8,
-//			}, {
-//				.eraseblocks = { {32 * 1024 * 1024, 1} },
-//				.block_erase = spi_block_erase_60,
-//			}, {
+//			}, 
+			{
+				.eraseblocks = { {64 * 1024, 512} },
+				.block_erase = spi_block_erase_dc,
+			}, {
+				.eraseblocks = { {64 * 1024, 512} },
+				.block_erase = spi_block_erase_d8,
+			}, {
+				.eraseblocks = { {32 * 1024 * 1024, 1} },
+				.block_erase = spi_block_erase_60,
+			}, {
 				.eraseblocks = { {32 * 1024 * 1024, 1} },
 				.block_erase = spi_block_erase_c7,
 			}
